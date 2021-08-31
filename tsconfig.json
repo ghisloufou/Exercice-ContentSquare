@@ -2,5 +2,6 @@
     "compilerOptions": {},
     "files": [
       "app.ts",
+      "Mower.ts",
     ]
   }

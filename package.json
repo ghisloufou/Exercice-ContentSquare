@@ -4,13 +4,17 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jasmine",
     "start": "npx tsc & node app.js"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^16.7.9",
+    "jasmine": "^3.9.0",
     "typescript": "^4.4.2"
+  },
+  "dependencies": {
+    "lodash": "^4.17.21"
   }
 }
