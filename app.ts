@@ -1,179 +1,139 @@
 import * as fs from "fs";
-import { cloneDeep } from "lodash";
 import { Mower } from "./Mower";
-console.log("____________________________");
 
-fs.readFile("./mower-input.txt", "utf8", function (err, data) {
+startApp();
+
+function startApp(fileToRead = "mower-input.txt") {
   try {
-    let lines = data.split("\r\n");
-    console.log("lines\n", lines);
-    const mapSize = lines
-      .shift()
-      .split(" ")
-      .map((item) => {
-        if (typeof +item !== "number") {
-          throw new Error("Map size error");
-        }
-        return +item;
-      });
-    const isEven = (n: number) => {
-      return n % 2 == 0;
-    };
-    if (!isEven(lines.length)) {
-      throw new Error("Mower input not valid");
-    }
-    console.log("mapSize", mapSize);
-    // const mowerTest = new Mower(1, 2, 3, "EFN");
-    let mowers: Mower[] = [];
-    for (let i = 0; i <= lines.length / 2; i += 2) {
-      const mowerProperties: any[] = lines[i].split(" ");
-      mowerProperties[0] = +mowerProperties[0];
-      mowerProperties[1] = +mowerProperties[1];
-      const validProperties = (properties) => {
-        return (
-          typeof properties[0] === "number" &&
-          properties[0] > 0 &&
-          properties[0] <= mapSize[0] &&
-          typeof properties[1] === "number" &&
-          properties[1] > 0 &&
-          properties[1] <= mapSize[1] &&
-          typeof properties[2].match("^[NESW]$")
-        );
+    fs.readFile("./" + fileToRead, "utf8", (err, data) => {
+      let lines = data.split("\r\n");
+      const mapSize = lines
+        .shift()
+        .split(" ")
+        .map((item) => {
+          if (+item === NaN) {
+            throw new Error("Map size error");
+          }
+          return +item;
+        });
+      const isEven = (n: number) => {
+        return n % 2 == 0;
       };
-      if (validProperties(mowerProperties)) {
-        mowers.push(
-          new Mower(
-            +mowerProperties[0],
-            +mowerProperties[1],
-            mowerProperties[2],
-            lines[i + 1]
-          )
-        );
-      } else {
-        throw new Error("Invalid input");
+      if (!isEven(lines.length)) {
+        throw new Error("Mower input not valid");
       }
-    }
+
+      let mowers: Mower[] = [];
+      // Read each mower lines and create mowers:
+      for (let i = 0; i <= lines.length / 2; i += 2) {
+        const mowerProperties: any[] = lines[i].split(" ");
+        mowerProperties[0] = +mowerProperties[0];
+        mowerProperties[1] = +mowerProperties[1];
+        const validProperties = (properties) => {
+          return (
+            typeof properties[0] === "number" &&
+            properties[0] > 0 &&
+            properties[0] <= mapSize[0] &&
+            typeof properties[1] === "number" &&
+            properties[1] > 0 &&
+            properties[1] <= mapSize[1] &&
+            typeof properties[2].match("^[NESW]$")
+          );
+        };
+        if (validProperties(mowerProperties)) {
+          mowers.push(
+            new Mower(
+              +mowerProperties[0],
+              +mowerProperties[1],
+              mowerProperties[2],
+              lines[i + 1]
+            )
+          );
+        } else {
+          throw new Error("Invalid input");
+        }
+      }
+
+      const emptyMap = initMap(mapSize[0], mapSize[1], mowers);
+      const movedMowers = moveMowers(emptyMap, mapSize[0], mapSize[1], mowers);
+      console.log("movedMowers", movedMowers);
+
+      fs.writeFile(
+        "./mower-output.txt",
+        movedMowers
+          .map((mower) => `${mower.x} ${mower.y} ${mower.orientation}`)
+          .join("\r\n"),
+        (err) => {
+          if (err) return console.log(err);
+        }
+      );
+      console.log(
+        'Script ended successfully, open "mower-output.txt" to see results.'
+      );
+    });
+    return true;
   } catch (error) {
     console.error("An error has occured:", error);
+    return false;
   }
-
-  fs.writeFile("./mower-output.txt", "test", function (err) {
-    if (err) return console.log(err);
-  });
-});
+}
 
 /**
- * Creates an grass map with parsed data from input file
- * @param {any[]} parsedData Parsed data from input file
- * @returns {"TreasureMap"} Basic map with only grass cells
+ * Create the map with data from input file
  */
-const initMap = function (parsedData) {
-  let cLine = parsedData.filter(function (line) {
-    return line[0] === "C";
-  })[0];
-  let width = Number(cLine[1]);
-  let height = Number(cLine[2]);
-  let matrix = Array(height)
+function initMap(width: number, height: number, mowers: Mower[]): null[][] {
+  let map = Array(height + 1)
     .fill(null)
-    .map(function (a, i) {
-      return Array(width)
+    .map((a, i) => {
+      return Array(width + 1)
         .fill(null)
-        .map(function (b, j) {
-          return { type: "Grass", x: j + 1, y: i + 1 };
-        });
+        .map((b, j) => null);
     });
-  return { matrix, height, width };
-};
+  // Populate map with mower's first position
+  mowers.forEach((mower) => {
+    if (map[mower.x][mower.y] !== null) {
+      throw new Error("Mowers are overlapping");
+    }
+    map[mower.x][mower.y] = mower;
+  });
+  return map;
+}
 
 /**
- * Move all the players and returns the new map, parsedData and possible movementErrors
- * @param {"TreasureMap"} map Generated map from input file
- * @param {any[]} parsedData Parsed data from input file
- * @returns {{ transformedMap: "TreasureMap", newParsedData: any[], movementError: boolean }} {transformedMap, newParsedData, movementError}
+ * Move all the moveMowers and returns the new map
  */
-const movePlayers = function (map, parsedData) {
-  let newParsedData = cloneDeep(parsedData);
-  let cLine = newParsedData.filter((line) => line[0] === "C")[0];
-  let players = newParsedData.filter((line) => line[0] === "A");
-  let newMap = cloneDeep(map);
-  let movementError = false; // Check wheter the player sequence is feasible
+function moveMowers(
+  map: any[][],
+  width: number,
+  height: number,
+  mowers: Mower[]
+): Mower[] {
+  // Update mowers' position
+  const updateMap = (mower: Mower, index: number) => {
+    const nextCell = mower.getNextPosition(index);
 
-  const updateMap = function (player, nextMovement, index) {
-    const nextCell =
-      newMap.matrix[nextMovement.player[3]][nextMovement.player[2]];
-    const lastCell = newMap.matrix[player[3]][player[2]];
-    if (nextMovement.didMove) {
-      // Edit new cell
-      if (nextCell.type === "Treasure" && nextCell.treasureCount > 1) {
-        nextCell.type = "Treasure&Player";
-        nextCell.playerValue = lastCell.playerValue + 1;
-        nextCell.treasureCount -= 1;
-      } else {
-        nextCell.playerValue = lastCell.playerValue;
-        if (nextCell.type === "Treasure" && nextCell.treasureCount === 1) {
-          delete nextCell.treasureCount;
-          nextCell.playerValue += +1;
-        }
-        nextCell.type = "Player";
-      }
-      nextCell.name = lastCell.name;
-      nextCell.sequence = lastCell.sequence;
-
-      switch (player[4]) {
-        case "S":
-          nextCell.orientation = 0;
-          break;
-        case "E":
-          nextCell.orientation = -90;
-          break;
-        case "O":
-          nextCell.orientation = 90;
-          break;
-        case "N":
-          nextCell.orientation = 180;
-          break;
-      }
-
-      // Edit last cell
-      if (lastCell.type === "Treasure&Player" && lastCell.treasureCount > 0) {
-        lastCell.type = "Treasure";
-      } else {
-        lastCell.type = "WasPlayer";
-        lastCell.lastPlayerName = nextCell.name;
-        delete lastCell.treasureCount;
-      }
-      delete lastCell.name;
-      delete lastCell.orientation;
-      delete lastCell.sequence;
-      delete lastCell.playerValue;
+    // Verify if next move is valid
+    if (
+      nextCell.x >= 0 &&
+      nextCell.x <= width &&
+      nextCell.y >= 0 &&
+      nextCell.y <= height &&
+      map[nextCell.x][nextCell.y] === null
+    ) {
+      map[mower.x][mower.y] = null;
+      mower.updateMowerPosition(nextCell.x, nextCell.y, index);
+      map[nextCell.x][nextCell.y] = mower;
+    } else {
+      mower.updateMowerPosition(mower.x, mower.y, index);
     }
-    lastCell.stepCount = index;
-    nextCell.stepCount = index + 1;
   };
 
-  let moving = true;
-  let i = 0;
-  let stopCount = 0;
-  while (moving) {
-    for (let player of players) {
-      if (player[5].length > i) {
-        const nextMove = player[5][i];
-        if (["A", "G", "D"].includes(nextMove)) {
-          const movement = this.move(player, nextMove, cLine, newMap);
-          updateMap(player, movement, i);
-          players[players.indexOf(player)] = cloneDeep(movement.player);
-        } else {
-          movementError = true;
-          moving = false;
-        }
-      } else {
-        stopCount++;
-      }
+  mowers.forEach((mower) => {
+    for (let index = 0; index < mower.actions.length; index++) {
+      updateMap(mower, index);
     }
-    if (stopCount === players.length) {
-      moving = false;
-    }
-    i++;
-  }
-  return { transformedMap: newMap, newParsedData, movementError };
-};
+  });
+  return mowers;
+}
+
+export { startApp, initMap, moveMowers };

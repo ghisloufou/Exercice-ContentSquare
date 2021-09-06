@@ -1,171 +1,117 @@
 "use strict";
 exports.__esModule = true;
+exports.moveMowers = exports.initMap = exports.startApp = void 0;
 var fs = require("fs");
-var lodash_1 = require("lodash");
 var Mower_1 = require("./Mower");
-console.log("____________________________");
-fs.readFile("./mower-input.txt", "utf8", function (err, data) {
+startApp();
+function startApp(fileToRead) {
+    if (fileToRead === void 0) { fileToRead = "mower-input.txt"; }
     try {
-        var lines = data.split("\r\n");
-        console.log("lines\n", lines);
-        var mapSize_1 = lines
-            .shift()
-            .split(" ")
-            .map(function (item) {
-            if (typeof +item !== "number") {
-                throw new Error("Map size error");
-            }
-            return +item;
-        });
-        var isEven = function (n) {
-            return n % 2 == 0;
-        };
-        if (!isEven(lines.length)) {
-            throw new Error("Mower input not valid");
-        }
-        console.log("mapSize", mapSize_1);
-        // const mowerTest = new Mower(1, 2, 3, "EFN");
-        var mowers = [];
-        for (var i = 0; i <= lines.length / 2; i += 2) {
-            var mowerProperties = lines[i].split(" ");
-            mowerProperties[0] = +mowerProperties[0];
-            mowerProperties[1] = +mowerProperties[1];
-            var validProperties = function (properties) {
-                return (typeof properties[0] === "number" &&
-                    properties[0] > 0 &&
-                    properties[0] <= mapSize_1[0] &&
-                    typeof properties[1] === "number" &&
-                    properties[1] > 0 &&
-                    properties[1] <= mapSize_1[1] &&
-                    typeof properties[2].match("^[NESW]$"));
+        fs.readFile("./" + fileToRead, "utf8", function (err, data) {
+            var lines = data.split("\r\n");
+            var mapSize = lines
+                .shift()
+                .split(" ")
+                .map(function (item) {
+                if (+item === NaN) {
+                    throw new Error("Map size error");
+                }
+                return +item;
+            });
+            var isEven = function (n) {
+                return n % 2 == 0;
             };
-            if (validProperties(mowerProperties)) {
-                mowers.push(new Mower_1.Mower(+mowerProperties[0], +mowerProperties[1], mowerProperties[2], lines[i + 1]));
+            if (!isEven(lines.length)) {
+                throw new Error("Mower input not valid");
             }
-            else {
-                throw new Error("Invalid input");
+            var mowers = [];
+            // Read each mower lines and create mowers:
+            for (var i = 0; i <= lines.length / 2; i += 2) {
+                var mowerProperties = lines[i].split(" ");
+                mowerProperties[0] = +mowerProperties[0];
+                mowerProperties[1] = +mowerProperties[1];
+                var validProperties = function (properties) {
+                    return (typeof properties[0] === "number" &&
+                        properties[0] > 0 &&
+                        properties[0] <= mapSize[0] &&
+                        typeof properties[1] === "number" &&
+                        properties[1] > 0 &&
+                        properties[1] <= mapSize[1] &&
+                        typeof properties[2].match("^[NESW]$"));
+                };
+                if (validProperties(mowerProperties)) {
+                    mowers.push(new Mower_1.Mower(+mowerProperties[0], +mowerProperties[1], mowerProperties[2], lines[i + 1]));
+                }
+                else {
+                    throw new Error("Invalid input");
+                }
             }
-        }
+            var emptyMap = initMap(mapSize[0], mapSize[1], mowers);
+            var movedMowers = moveMowers(emptyMap, mapSize[0], mapSize[1], mowers);
+            console.log("movedMowers", movedMowers);
+            fs.writeFile("./mower-output.txt", movedMowers
+                .map(function (mower) { return mower.x + " " + mower.y + " " + mower.orientation; })
+                .join("\r\n"), function (err) {
+                if (err)
+                    return console.log(err);
+            });
+            console.log('Script ended successfully, open "mower-output.txt" to see results.');
+        });
+        return true;
     }
     catch (error) {
         console.error("An error has occured:", error);
+        return false;
     }
-    fs.writeFile("./mower-output.txt", "test", function (err) {
-        if (err)
-            return console.log(err);
-    });
-});
+}
+exports.startApp = startApp;
 /**
- * Creates an grass map with parsed data from input file
- * @param {any[]} parsedData Parsed data from input file
- * @returns {"TreasureMap"} Basic map with only grass cells
+ * Create the map with data from input file
  */
-var initMap = function (parsedData) {
-    var cLine = parsedData.filter(function (line) {
-        return line[0] === "C";
-    })[0];
-    var width = Number(cLine[1]);
-    var height = Number(cLine[2]);
-    var matrix = Array(height)
+function initMap(width, height, mowers) {
+    var map = Array(height + 1)
         .fill(null)
         .map(function (a, i) {
-        return Array(width)
+        return Array(width + 1)
             .fill(null)
-            .map(function (b, j) {
-            return { type: "Grass", x: j + 1, y: i + 1 };
-        });
+            .map(function (b, j) { return null; });
     });
-    return { matrix: matrix, height: height, width: width };
-};
+    // Populate map with mower's first position
+    mowers.forEach(function (mower) {
+        if (map[mower.x][mower.y] !== null) {
+            throw new Error("Mowers are overlapping");
+        }
+        map[mower.x][mower.y] = mower;
+    });
+    return map;
+}
+exports.initMap = initMap;
 /**
- * Move all the players and returns the new map, parsedData and possible movementErrors
- * @param {"TreasureMap"} map Generated map from input file
- * @param {any[]} parsedData Parsed data from input file
- * @returns {{ transformedMap: "TreasureMap", newParsedData: any[], movementError: boolean }} {transformedMap, newParsedData, movementError}
+ * Move all the moveMowers and returns the new map
  */
-var movePlayers = function (map, parsedData) {
-    var newParsedData = (0, lodash_1.cloneDeep)(parsedData);
-    var cLine = newParsedData.filter(function (line) { return line[0] === "C"; })[0];
-    var players = newParsedData.filter(function (line) { return line[0] === "A"; });
-    var newMap = (0, lodash_1.cloneDeep)(map);
-    var movementError = false; // Check wheter the player sequence is feasible
-    var updateMap = function (player, nextMovement, index) {
-        var nextCell = newMap.matrix[nextMovement.player[3]][nextMovement.player[2]];
-        var lastCell = newMap.matrix[player[3]][player[2]];
-        if (nextMovement.didMove) {
-            // Edit new cell
-            if (nextCell.type === "Treasure" && nextCell.treasureCount > 1) {
-                nextCell.type = "Treasure&Player";
-                nextCell.playerValue = lastCell.playerValue + 1;
-                nextCell.treasureCount -= 1;
-            }
-            else {
-                nextCell.playerValue = lastCell.playerValue;
-                if (nextCell.type === "Treasure" && nextCell.treasureCount === 1) {
-                    delete nextCell.treasureCount;
-                    nextCell.playerValue += +1;
-                }
-                nextCell.type = "Player";
-            }
-            nextCell.name = lastCell.name;
-            nextCell.sequence = lastCell.sequence;
-            switch (player[4]) {
-                case "S":
-                    nextCell.orientation = 0;
-                    break;
-                case "E":
-                    nextCell.orientation = -90;
-                    break;
-                case "O":
-                    nextCell.orientation = 90;
-                    break;
-                case "N":
-                    nextCell.orientation = 180;
-                    break;
-            }
-            // Edit last cell
-            if (lastCell.type === "Treasure&Player" && lastCell.treasureCount > 0) {
-                lastCell.type = "Treasure";
-            }
-            else {
-                lastCell.type = "WasPlayer";
-                lastCell.lastPlayerName = nextCell.name;
-                delete lastCell.treasureCount;
-            }
-            delete lastCell.name;
-            delete lastCell.orientation;
-            delete lastCell.sequence;
-            delete lastCell.playerValue;
+function moveMowers(map, width, height, mowers) {
+    // Update mowers' position
+    var updateMap = function (mower, index) {
+        var nextCell = mower.getNextPosition(index);
+        // Verify if next move is valid
+        if (nextCell.x >= 0 &&
+            nextCell.x <= width &&
+            nextCell.y >= 0 &&
+            nextCell.y <= height &&
+            map[nextCell.x][nextCell.y] === null) {
+            map[mower.x][mower.y] = null;
+            mower.updateMowerPosition(nextCell.x, nextCell.y, index);
+            map[nextCell.x][nextCell.y] = mower;
         }
-        lastCell.stepCount = index;
-        nextCell.stepCount = index + 1;
+        else {
+            mower.updateMowerPosition(mower.x, mower.y, index);
+        }
     };
-    var moving = true;
-    var i = 0;
-    var stopCount = 0;
-    while (moving) {
-        for (var _i = 0, players_1 = players; _i < players_1.length; _i++) {
-            var player = players_1[_i];
-            if (player[5].length > i) {
-                var nextMove = player[5][i];
-                if (["A", "G", "D"].includes(nextMove)) {
-                    var movement = this.move(player, nextMove, cLine, newMap);
-                    updateMap(player, movement, i);
-                    players[players.indexOf(player)] = (0, lodash_1.cloneDeep)(movement.player);
-                }
-                else {
-                    movementError = true;
-                    moving = false;
-                }
-            }
-            else {
-                stopCount++;
-            }
+    mowers.forEach(function (mower) {
+        for (var index = 0; index < mower.actions.length; index++) {
+            updateMap(mower, index);
         }
-        if (stopCount === players.length) {
-            moving = false;
-        }
-        i++;
-    }
-    return { transformedMap: newMap, newParsedData: newParsedData, movementError: movementError };
-};
+    });
+    return mowers;
+}
+exports.moveMowers = moveMowers;
