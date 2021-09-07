@@ -7,60 +7,58 @@ startApp();
 function startApp(fileToRead) {
     if (fileToRead === void 0) { fileToRead = "mower-input.txt"; }
     try {
-        fs.readFile("./" + fileToRead, "utf8", function (err, data) {
-            var lines = data.split("\r\n");
-            var mapSize = lines
-                .shift()
-                .split(" ")
-                .map(function (item) {
-                if (+item === NaN) {
-                    throw new Error("Map size error");
-                }
-                return +item;
-            });
-            var isEven = function (n) {
-                return n % 2 == 0;
-            };
-            if (!isEven(lines.length)) {
-                throw new Error("Mower input not valid");
+        var data = fs.readFileSync("./" + fileToRead, "utf8");
+        var lines = data.split("\r\n");
+        var mapSize_1 = lines
+            .shift()
+            .split(" ")
+            .map(function (item) {
+            if (+item === NaN) {
+                throw new Error("Map size error");
             }
-            var mowers = [];
-            // Read each mower lines and create mowers:
-            for (var i = 0; i <= lines.length / 2; i += 2) {
-                var mowerProperties = lines[i].split(" ");
-                mowerProperties[0] = +mowerProperties[0];
-                mowerProperties[1] = +mowerProperties[1];
-                var validProperties = function (properties) {
-                    return (typeof properties[0] === "number" &&
-                        properties[0] > 0 &&
-                        properties[0] <= mapSize[0] &&
-                        typeof properties[1] === "number" &&
-                        properties[1] > 0 &&
-                        properties[1] <= mapSize[1] &&
-                        typeof properties[2].match("^[NESW]$"));
-                };
-                if (validProperties(mowerProperties)) {
-                    mowers.push(new Mower_1.Mower(+mowerProperties[0], +mowerProperties[1], mowerProperties[2], lines[i + 1]));
-                }
-                else {
-                    throw new Error("Invalid input");
-                }
-            }
-            var emptyMap = initMap(mapSize[0], mapSize[1], mowers);
-            var movedMowers = moveMowers(emptyMap, mapSize[0], mapSize[1], mowers);
-            console.log("movedMowers", movedMowers);
-            fs.writeFile("./mower-output.txt", movedMowers
-                .map(function (mower) { return mower.x + " " + mower.y + " " + mower.orientation; })
-                .join("\r\n"), function (err) {
-                if (err)
-                    return console.log(err);
-            });
-            console.log('Script ended successfully, open "mower-output.txt" to see results.');
+            return +item;
         });
+        var isEven = function (n) {
+            return n % 2 == 0;
+        };
+        if (!isEven(lines.length)) {
+            throw new Error("Mower input not valid");
+        }
+        var mowers = [];
+        // Read each mower lines and create mowers:
+        for (var i = 0; i <= lines.length / 2; i += 2) {
+            var mowerProperties = lines[i].split(" ");
+            mowerProperties[0] = +mowerProperties[0];
+            mowerProperties[1] = +mowerProperties[1];
+            var validProperties = function (properties) {
+                return (typeof properties[0] === "number" &&
+                    properties[0] > 0 &&
+                    properties[0] <= mapSize_1[0] &&
+                    typeof properties[1] === "number" &&
+                    properties[1] > 0 &&
+                    properties[1] <= mapSize_1[1] &&
+                    typeof properties[2].match("^[NESW]$"));
+            };
+            if (validProperties(mowerProperties)) {
+                mowers.push(new Mower_1.Mower(+mowerProperties[0], +mowerProperties[1], mowerProperties[2], lines[i + 1]));
+            }
+            else {
+                throw new Error("Invalid input");
+            }
+        }
+        var emptyMap = initMap(mapSize_1[0], mapSize_1[1], mowers);
+        var movedMowers = moveMowers(emptyMap, mapSize_1[0], mapSize_1[1], mowers);
+        fs.writeFile("./mower-output.txt", movedMowers
+            .map(function (mower) { return mower.x + " " + mower.y + " " + mower.orientation; })
+            .join("\r\n"), function (err) {
+            if (err)
+                return console.log(err);
+        });
+        console.log('Script ended successfully, open "mower-output.txt" to see results.');
         return true;
     }
-    catch (error) {
-        console.error("An error has occured:", error);
+    catch (err) {
+        console.error("An error has occured:", err);
         return false;
     }
 }
